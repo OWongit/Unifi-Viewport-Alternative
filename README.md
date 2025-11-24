@@ -1,50 +1,57 @@
-RTSP Fullscreen Viewer (OpenCV) — Dual-Stream
+# UniFi Protect Multi-Camera Viewer (Viewport Alternative)
 
-A tiny Python script that opens one or TWO RTSP/RTSPS video streams in a single **fullscreen** window using OpenCV. 
-Each stream reconnects automatically if it drops, and you can **quit** with `q` or `Esc`. 
-The viewer uses a custom black canvas for letterboxing so there are no white gutters in fullscreen.
+A Python application that displays multiple UniFi Protect camera streams in a dynamic fullscreen grid layout using Tkinter. Features automatic camera discovery, RTSP stream management, and motion detection with visual highlighting.
 
 ## Camera View
-![RTSP side-by-side fullscreen](images/cam_view.png)
 
-## What’s new
-- **Two concurrent streams** shown **side-by-side** in one window.
-- **Independent reconnect** per stream with the same `RETRY_SECONDS` backoff.
-- **Background reader threads** for smooth playback while the UI stays responsive.
-- **Black letterbox background** (our own canvas) so fullscreen margins aren’t white.
-- **Status overlays** on each tile (e.g., `LIVE`, `FROZEN`, `connecting...`).
-- **ASCII-safe labels**: overlays use `-` instead of the Unicode em dash `—` to avoid `???` with OpenCV’s built-in fonts.
-  - If you want Unicode text, use `opencv-contrib-python` with FreeType or render with PIL.
+![Multi-camera fullscreen grid](images/cam_view.png)
 
 ## Features
-- Prefers the **FFmpeg** backend (`cv2.CAP_FFMPEG`) when available for robust RTSP handling.
-- Fullscreen display via OpenCV HighGUI.
-- Automatic reconnect with a configurable delay (`RETRY_SECONDS`, default 60s).
-- Graceful exit with `q` or `Esc`.
+
+- **Dynamic Grid Layout**: Automatically arranges cameras in an N×N grid based on the number of detected cameras
+- **UniFi Protect Integration**: Automatically discovers cameras via UniFi Protect Integration API
+- **RTSP Stream Management**: Automatically creates and manages RTSP streams of the desired quality
+- **Motion Detection**: Visual motion highlighting with pulsing blue border (trailing buffer)
+- **Flask Webhook Server**: Receives motion detection events from UniFi Protect
+- **Automatic Reconnection**: Streams automatically reconnect on failure with configurable retry delay
+- **Fullscreen Display**: Clean fullscreen interface with date/time overlay
+- **Status Overlays**: Real-time status indicators (LIVE, Frozen, reconnecting) on each camera feed
 
 ## Requirements
+
 - **Python** 3.9+
-- **NumPy** (for the mosaic/canvas)
-- **OpenCV** (e.g., `opencv-python`)
-- OS GUI support for OpenCV windows (e.g., X11 on Linux, Quartz on macOS, Win32 on Windows)
-- (Recommended) **FFmpeg** installed on your system for broader codec/RTSP support
+- **UniFi Protect** system with Integration API access
+- **FFmpeg** (recommended for better RTSP codec support)
 
-## Install
-```bash
-# 1) from requirements.txt
-pip install -r requirements.txt
-# 2) or directly
-pip install opencv-python numpy
+## Configuration
+
+Edit `config.py` to configure:
+
+- `API_KEY`: Your UniFi Protect Integration API key
+- `UNIFI_HOST`: IP address of your UniFi Protect console (default: `192.168.1.1`)
+- `STREAM_QUALITY`: RTSP stream quality - `"high"`, `"medium"`, or `"low"` (default: `"high"`)
+- `RETRY_SECONDS`: Reconnection delay in seconds (default: `60`)
+- `ENABLE_MOTION_DETECTION`: Enable/disable motion highlighting (default: `True`)
+
+## Usage
+
+1. Configure your UniFi Protect API credentials in `config.py`
+2. Set up a webhook in UniFi Protect pointing to `http://<your-pi-ip>:5000/motion`
+3. Run the application
+
+
+## Motion Detection
+
+Motion events are received via webhook from UniFi Protect. When motion is detected:
+- A pulsing blue border appears around the affected camera feed
+- The border remains visible after motion stops
+- Motion detection can be disabled via `ENABLE_MOTION_DETECTION` in `config.py`
+
+## Webhook Setup
+
+Configure UniFi Protect to send motion events to:
 ```
- 
-## Configure
-In the script, set:
-- `rtsp_url_1` / `rtsp_url_2` – your two RTSP/RTSPS URLs
-- `name_left` / `name_right` – overlay titles for each camera
-- `RETRY_SECONDS` – reconnect delay (default 60s)
-- `TARGET_HEIGHT` – per-tile height before mosaicking (bigger = larger tiles)
+http://<raspberry-pi-ip(or any device)>:5000/motion
+```
 
-
-## Controls
-- `q` or `Esc` – quit
-- (Optional) To make the window resizable instead of fullscreen, remove the line that sets `WND_PROP_FULLSCREEN` in the script.
+IMPORTANT: The webhook payload should include the camera name in `alarm.name` (e.g., "Front Door", "Back Door").

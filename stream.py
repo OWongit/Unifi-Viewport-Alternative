@@ -1,16 +1,11 @@
 import threading
 import time
+import cv2
 import helpers
 from config import CONFIG
 
 # ========= CONFIG =========
-rtsp_url_1 = CONFIG["rtsp_url_1"]
-rtsp_url_2 = CONFIG["rtsp_url_2"]
-RETRY_SECONDS = CONFIG["RETRY_SECONDS"]
-WINDOW_NAME = CONFIG["WINDOW_NAME"]
-TARGET_HEIGHT = CONFIG["TARGET_HEIGHT"]
-FONT = CONFIG["FONT"]
-
+RETRY_SECONDS = CONFIG.get("RETRY_SECONDS", 60)
 
 class RTSPStream:
     """
@@ -33,7 +28,8 @@ class RTSPStream:
 
     def stop(self):
         self._stop.set()
-        self._thread.join(timeout=2.0)
+        if self._thread.is_alive():
+            self._thread.join(timeout=2.0)
 
     def get_frame(self):
         with self._lock:
@@ -55,8 +51,8 @@ class RTSPStream:
             while not self._stop.is_set():
                 ret, frame = cap.read()
                 if not ret or frame is None:
-                    self.status = "dropped (reconnecting...)"
-                    log(f"{self.name}: Error: Could not read frame. Retrying in {RETRY_SECONDS} seconds...")
+                    self.status = "reconnecting"
+                    helpers.log(f"{self.name}: Error: Could not read frame. Retrying in {RETRY_SECONDS} seconds...")
                     break
                 with self._lock:
                     self._frame = frame
