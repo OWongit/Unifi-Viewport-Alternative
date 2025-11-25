@@ -1,4 +1,4 @@
-# UniFi Protect Multi-Camera Viewer (Viewport Alternative)
+# UniFi Protect Multi-Camera Viewer ([Viewport](https://store.ui.com/us/en/products/ufp-viewport) Alternative)
 
 A Python application that displays multiple UniFi Protect camera streams in a dynamic fullscreen grid layout using Tkinter. Features automatic camera discovery, RTSP stream management, and motion detection with visual highlighting.
 
@@ -55,3 +55,35 @@ http://<raspberry-pi-ip(or any device)>:5000/motion
 ```
 
 IMPORTANT: The webhook payload should include the camera name in `alarm.name` (e.g., "Front Door", "Back Door").
+
+## Raspberry Pi Start on Launch Setup (optional)
+[This is how the program can fully replace Unifi Viewport ($200 Viewport vs $60 Raspi)]
+
+1. Create the startup script:
+
+   nano ~/Unifi-Viewport-Alternative/start_cams.sh
+
+   Contents:
+   #!/bin/bash
+   cd /home/user/Unifi-Viewport-Alternative
+   source .venv/bin/activate # if using a virtual environment (optional but reccomended)
+   export DISPLAY=:0
+   python main.py
+
+   Then make it executable:
+   chmod +x ~/Unifi-Viewport-Alternative/start_cams.sh
+
+2. Configure LXDE autostart:
+
+   mkdir -p ~/.config/lxsession/LXDE-pi
+   nano ~/.config/lxsession/LXDE-pi/autostart
+
+   Add this line:
+   @/home/user/Unifi-Viewport-Alternative/start_cams.sh
+
+3. Ensure the Pi boots to desktop with autologin:
+
+   sudo raspi-config
+   System Options -> Boot / Auto Login -> Desktop Autologin
+
+After reboot, Unifi-Viewport-Alternative will start automatically when the desktop loads.
