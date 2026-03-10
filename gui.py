@@ -1,24 +1,27 @@
+import math
 import tkinter as tk
 import cv2
 import time
-import math
 import logging
+from queue import Empty
 from PIL import Image, ImageTk
 from datetime import datetime
 
 import helpers
 from config import CONFIG
 from stream import RTSPStream
+from video_player import MP4FrameSource
 
 # Setup simple logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("GUI")
 
 class App:
-    def __init__(self, camera_configs, unifi_client=None):
+    def __init__(self, camera_configs, unifi_client=None, playback_queue=None):
         """
         camera_configs: list of dicts {name, id, url}
-        unifi_client: instance of UnifiClient to query motion state
+        unifi_client: optional, reserved for future use
+        playback_queue: queue.Queue for (video_path, stream_index) requests
         """
         self.root = tk.Tk()
         self.root.title("Multi Cam Viewer")
@@ -31,6 +34,8 @@ class App:
         
         self.camera_configs = camera_configs
         self.unifi_client = unifi_client
+        self.playback_queue = playback_queue
+        self.overlay_state = {}  # stream_index -> MP4FrameSource
         self.num_cams = len(camera_configs)
         
         # Calculate Grid Size (NxN approx)
@@ -87,6 +92,9 @@ class App:
 
     def close(self, event=None):
         logger.info("Closing application...")
+        for overlay in self.overlay_state.values():
+            overlay.close()
+        self.overlay_state.clear()
         for s in self.streams:
             s.stop()
         self.root.destroy()
@@ -101,7 +109,22 @@ class App:
         Main video loop. Fetches frames, resizes, and updates labels.
         """
         if not self.labels: return
-        
+
+        # Process playback requests from control panel
+        if self.playback_queue:
+            try:
+                while True:
+                    path, stream_index = self.playback_queue.get_nowait()
+                    if 0 <= stream_index < len(self.streams):
+                        # Close existing overlay on this stream if any
+                        if stream_index in self.overlay_state:
+                            self.overlay_state[stream_index].close()
+                            del self.overlay_state[stream_index]
+                        self.overlay_state[stream_index] = MP4FrameSource(path)
+                        logger.info(f"Playing {path} on stream {stream_index}")
+            except Empty:
+                pass  # Queue empty
+
         for i, stream in enumerate(self.streams):
             label_widget = self.labels[i]
             config = self.camera_configs[i]
@@ -115,15 +138,24 @@ class App:
             if w < 10: w = self.root.winfo_screenwidth() // self.cols
             if h < 10: h = self.root.winfo_screenheight() // self.rows
 
-            self._update_single_view(label_widget, stream, w, h, name, cam_id)
+            self._update_single_view(i, label_widget, stream, w, h, name, cam_id)
 
         # Target ~30 FPS
-        self.root.after(33, self.update_video)
+        self.root.after(24, self.update_video)
 
-    def _update_single_view(self, label_widget, stream, width, height, name, cam_id):
-        frame, status, ts = stream.get_frame()
+    def _update_single_view(self, stream_index, label_widget, stream, width, height, name, cam_id):
+        # Check for MP4 overlay on this stream
+        if stream_index in self.overlay_state:
+            overlay = self.overlay_state[stream_index]
+            frame, status, ts = overlay.get_frame()
+            if frame is None:
+                overlay.close()
+                del self.overlay_state[stream_index]
+                frame, status, ts = stream.get_frame()
+        else:
+            frame, status, ts = stream.get_frame()
+
         stale = False
-        
         if frame is None:
             # Create placeholder if no frame yet
             frame = helpers.make_placeholder(f"{name}: {status}", width, height)
@@ -138,22 +170,9 @@ class App:
         # Convert to Tkinter format
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         img = Image.fromarray(frame_rgb)
-        
-        # Check Motion State (only if enabled in config)
-        is_motion = False
-        pulse = 1.0
-        if CONFIG.get("ENABLE_MOTION_DETECTION", True) and self.unifi_client:
-            last_motion = self.unifi_client.get_last_motion(cam_id)
-            if time.time() - last_motion < 8.0: # buffer
-                is_motion = True
-                # Calculate Pulse Intensity if motion is active
-                # Pulse effect: oscillate alpha between ~0.2 and 1.0
-                # Speed factor: 8.0 (approx 1.25 Hz)
-                pulse = (math.sin(time.time() * 8.0) + 1) / 2  # 0.0 to 1.0
-                pulse = 0.2 + (pulse * 0.8) # 0.2 to 1.0 range
 
-        # Annotate with Text and/or Motion Border
-        img = helpers.draw_overlay(img, name, status, stale, motion_active=is_motion, motion_alpha=pulse)
+        # Annotate with Text
+        img = helpers.draw_overlay(img, name, status, stale, motion_active=False, motion_alpha=1.0)
         
         imgtk = ImageTk.PhotoImage(image=img)
 

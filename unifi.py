@@ -1,10 +1,6 @@
 import requests
 import urllib3
-import time
-import threading
-import json
 import logging
-from flask import Flask, request
 from config import CONFIG
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -22,24 +18,6 @@ class UnifiClient:
             "X-API-KEY": self.api_key,
             "Accept": "application/json",
         }
-        
-        # Motion state: {camera_id: last_motion_ts}
-        self._motion_state = {}
-        self._lock = threading.Lock()
-        
-        # Camera name to Camera ID mapping: {camera_name: camera_id}
-        self._name_to_camera = {}
-        
-        # Flask App for Webhooks
-        self.app = Flask(__name__)
-        
-        @self.app.route("/motion", methods=["POST"])
-        def webhook():
-            data = request.json
-            if data:
-                logger.debug(f"Webhook received: {json.dumps(data, indent=4)}")
-                self._handle_webhook(data)
-            return "OK", 200
 
     def get_cameras(self):
         """Fetch all cameras from the UniFi Protect API."""
@@ -52,41 +30,10 @@ class UnifiClient:
             data = resp.json()
             
             cameras = data if isinstance(data, list) else (data.get("cameras", []) if isinstance(data, dict) else [])
-            # Build name-to-camera mapping
-            self._build_name_mapping(cameras)
-            
             return cameras
         except Exception as e:
             logger.error(f"Error fetching cameras: {e}")
             return []
-
-    def _build_name_mapping(self, cameras):
-        """Build mapping from camera name to camera ID."""
-        self._name_to_camera = {}
-        for cam in cameras:
-            cam_id = cam.get("id")
-            cam_name = cam.get("name")
-            if cam_name and cam_id:
-                self._name_to_camera[cam_name] = cam_id
-                logger.info(f"Mapped camera name '{cam_name}' -> camera ID {cam_id}")
-
-    def _handle_webhook(self, data):
-        """Handle webhook payload: extract camera name and update motion state."""
-        try:
-            alarm = data.get("alarm", {})
-            camera_name = alarm.get("name")
-            
-            if camera_name:
-                # Map camera name to camera ID
-                cam_id = self._name_to_camera.get(camera_name)
-                if cam_id:
-                    logger.info(f"MOTION detected on '{camera_name}' -> camera ID {cam_id}")
-                    with self._lock:
-                        self._motion_state[cam_id] = time.time()
-                else:
-                    logger.warning(f"MOTION detected on '{camera_name}' but no camera mapping found")
-        except Exception as e:
-            logger.error(f"Error handling webhook: {e}")
 
     def ensure_single_stream(self, camera_id):
         """Ensures only one RTSP stream of the configured quality exists for the camera."""
@@ -125,22 +72,6 @@ class UnifiClient:
         except Exception as e:
             logger.error(f"Error creating stream: {e}")
         return None
-
-    def start_event_listener(self):
-        """Starts the Flask server in a background thread."""
-        t = threading.Thread(target=self._run_flask, daemon=True)
-        t.start()
-
-    def _run_flask(self):
-        logger.info("Starting Webhook Server on port 5000...")
-        try:
-            self.app.run(host='0.0.0.0', port=5000, debug=False, use_reloader=False)
-        except Exception as e:
-            logger.error(f"Flask server failed: {e}")
-
-    def get_last_motion(self, camera_id):
-        with self._lock:
-            return self._motion_state.get(camera_id, 0)
 
     def stop(self):
         pass

@@ -175,3 +175,5 @@ cython_debug/
 
 
 .config.py
+my_config.py
+config.py

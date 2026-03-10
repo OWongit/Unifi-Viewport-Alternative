@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Video Control Panel</title>
+    <style>
+        /* GitHub Dark Default theme */
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
+            background: #0d1117;
+            color: #fff;
+            margin: 0;
+            padding: 20px;
+        }
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            width: 100%;
+            padding: 12px 0;
+            margin-bottom: 24px;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+        .gear-btn {
+            position: absolute;
+            right: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            background: transparent;
+            border: none;
+            color: #fff;
+            cursor: pointer;
+            padding: 8px;
+            font-size: 1.5rem;
+        }
+        .gear-btn:hover { color: #fff; }
+        .buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        .play-btn {
+            padding: 14px 24px;
+            font-size: 16px;
+            background: #21262d;
+            color: #fff;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            cursor: pointer;
+            box-shadow: 0 0 12px rgba(88, 166, 255, 0.06);
+        }
+        .play-btn:hover {
+            background: #30363d;
+            border-color: #8b949e;
+            box-shadow: 0 0 16px rgba(88, 166, 255, 0.1);
+        }
+        .play-btn:active { background: #161b22; }
+        .status { margin-top: 20px; color: #fff; font-size: 14px; }
+
+        /* Settings overlay */
+        .settings-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(1, 4, 9, 0.8);
+            z-index: 100;
+            align-items: center;
+            justify-content: center;
+        }
+        .settings-overlay.visible { display: flex; }
+        .settings-panel {
+            position: relative;
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 24px;
+            width: 420px;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 0 24px rgba(88, 166, 255, 0.08);
+        }
+        .settings-panel h2 { margin-top: 0; margin-right: 32px; color: #fff; }
+        .settings-panel h3 { color: #fff; }
+        .settings-exit-btn {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            background: transparent;
+            border: none;
+            color: #fff;
+            cursor: pointer;
+            padding: 4px;
+            font-size: 1.25rem;
+            line-height: 1;
+        }
+        .settings-exit-btn:hover { color: #fff; }
+        .add-section {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+        .add-section input[type="text"] {
+            padding: 10px 12px;
+            background: #0d1117;
+            border: 1px solid #30363d;
+            color: #fff;
+            border-radius: 6px;
+            box-shadow: 0 0 8px rgba(88, 166, 255, 0.04);
+        }
+        .add-section input[type="text"]:focus {
+            outline: none;
+            border-color: #58a6ff;
+            box-shadow: 0 0 0 1px #58a6ff;
+        }
+        .add-section input[type="file"] { color: #fff; }
+        .add-btn {
+            padding: 10px 20px;
+            background: #238636;
+            color: #fff;
+            border: 1px solid #2ea043;
+            border-radius: 6px;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(46, 160, 67, 0.15);
+        }
+        .add-btn:hover { background: #2ea043; box-shadow: 0 0 14px rgba(46, 160, 67, 0.25); }
+        .add-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .button-list { list-style: none; padding: 0; margin: 0; }
+        .button-list li {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 12px;
+            margin: 4px 0;
+            border-bottom: 1px solid #21262d;
+            border-radius: 6px;
+            box-shadow: 0 0 8px rgba(88, 166, 255, 0.04);
+        }
+        .button-list li:last-child { border-bottom: none; }
+        .btn-order { display: flex; flex-direction: column; gap: 2px; }
+        .btn-order button {
+            padding: 2px 8px;
+            background: #21262d;
+            border: 1px solid #30363d;
+            color: #fff;
+            cursor: pointer;
+            font-size: 12px;
+            border-radius: 4px;
+            box-shadow: 0 0 6px rgba(88, 166, 255, 0.04);
+        }
+        .btn-order button:hover:not(:disabled) { color: #fff; border-color: #8b949e; }
+        .btn-order button:disabled { opacity: 0.4; cursor: not-allowed; }
+        .btn-info { flex: 1; min-width: 0; }
+        .btn-info .name { font-weight: 500; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #fff; }
+        .btn-info .file { font-size: 12px; color: #fff; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .btn-remove {
+            padding: 6px 12px;
+            background: #21262d;
+            color: #fff;
+            border: 1px solid #f85149;
+            border-radius: 4px;
+            cursor: pointer;
+            box-shadow: 0 0 8px rgba(248, 81, 73, 0.08);
+        }
+        .btn-remove:hover { background: rgba(248, 81, 73, 0.15); box-shadow: 0 0 12px rgba(248, 81, 73, 0.15); }
+        .close-settings {
+            margin-top: 20px;
+            padding: 10px 24px;
+            background: #21262d;
+            color: #fff;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(88, 166, 255, 0.06);
+        }
+        .close-settings:hover {
+            background: #30363d;
+            border-color: #8b949e;
+            box-shadow: 0 0 14px rgba(88, 166, 255, 0.1);
+        }
+        .empty-msg { color: #fff; font-style: italic; }
+
+        /* Scrollbar - match theme */
+        .settings-panel {
+            scrollbar-color: #30363d #21262d;
+            scrollbar-width: thin;
+        }
+        .settings-panel::-webkit-scrollbar {
+            width: 10px;
+        }
+        .settings-panel::-webkit-scrollbar-track {
+            background: #21262d;
+            border-radius: 6px;
+        }
+        .settings-panel::-webkit-scrollbar-thumb {
+            background: #30363d;
+            border-radius: 6px;
+        }
+        .settings-panel::-webkit-scrollbar-thumb:hover {
+            background: #484f58;
+        }
+        body {
+            scrollbar-color: #30363d #21262d;
+            scrollbar-width: thin;
+        }
+        body::-webkit-scrollbar {
+            width: 10px;
+        }
+        body::-webkit-scrollbar-track {
+            background: #21262d;
+        }
+        body::-webkit-scrollbar-thumb {
+            background: #30363d;
+            border-radius: 6px;
+        }
+        body::-webkit-scrollbar-thumb:hover {
+            background: #484f58;
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <h1>CAMS VID BOARD</h1>
+        <button class="gear-btn" id="gearBtn" title="Settings">&#9881;</button>
+    </header>
+
+    <main>
+        <div class="buttons" id="buttons"></div>
+        <p class="status" id="status"></p>
+    </main>
+
+    <div class="settings-overlay" id="settingsOverlay">
+        <div class="settings-panel" onclick="event.stopPropagation()">
+            <button class="settings-exit-btn" id="settingsExitBtn" title="Close">&#215;</button>
+            <h2>Settings</h2>
+            <div class="add-section">
+                <input type="file" id="fileInput" accept=".mp4,.mov,video/mp4,video/quicktime">
+                <input type="text" id="nameInput" placeholder="Button name">
+                <button class="add-btn" id="addBtn">Add Button</button>
+            </div>
+            <h3>Buttons</h3>
+            <ul class="button-list" id="buttonList"></ul>
+            <button class="close-settings" id="closeSettings">Close</button>
+        </div>
+    </div>
+
+    <script>
+        const buttonsEl = document.getElementById('buttons');
+        const statusEl = document.getElementById('status');
+        const gearBtn = document.getElementById('gearBtn');
+        const settingsOverlay = document.getElementById('settingsOverlay');
+        const fileInput = document.getElementById('fileInput');
+        const nameInput = document.getElementById('nameInput');
+        const addBtn = document.getElementById('addBtn');
+        const buttonListEl = document.getElementById('buttonList');
+        const closeSettings = document.getElementById('closeSettings');
+        const settingsExitBtn = document.getElementById('settingsExitBtn');
+
+        let buttons = [];
+
+        async function loadButtons() {
+            try {
+                const r = await fetch('/api/buttons');
+                buttons = await r.json();
+                renderButtons();
+                renderSettingsList();
+            } catch (e) {
+                statusEl.textContent = 'Failed to load buttons: ' + e.message;
+            }
+        }
+
+        function renderButtons() {
+            buttonsEl.innerHTML = '';
+            buttons.forEach(b => {
+                const btn = document.createElement('button');
+                btn.className = 'play-btn';
+                btn.textContent = b.name;
+                btn.onclick = () => play(b.file);
+                buttonsEl.appendChild(btn);
+            });
+        }
+
+        function renderSettingsList() {
+            buttonListEl.innerHTML = '';
+            if (buttons.length === 0) {
+                buttonListEl.innerHTML = '<li class="empty-msg">No buttons. Add one above.</li>';
+                return;
+            }
+            buttons.forEach((b, i) => {
+                const li = document.createElement('li');
+                li.innerHTML = `
+                    <div class="btn-order">
+                        <button ${i === 0 ? 'disabled' : ''} onclick="moveUp(${i})">&#9650;</button>
+                        <button ${i === buttons.length - 1 ? 'disabled' : ''} onclick="moveDown(${i})">&#9660;</button>
+                    </div>
+                    <div class="btn-info">
+                        <span class="name">${escapeHtml(b.name)}</span><br>
+                        <span class="file">${escapeHtml(b.file)}</span>
+                    </div>
+                    <button class="btn-remove" onclick="removeButton(${i})">Remove</button>
+                `;
+                buttonListEl.appendChild(li);
+            });
+        }
+
+        function escapeHtml(s) {
+            const div = document.createElement('div');
+            div.textContent = s;
+            return div.innerHTML;
+        }
+
+        async function play(filename) {
+            statusEl.textContent = 'Playing...';
+            try {
+                const r = await fetch('/play/' + encodeURIComponent(filename), { method: 'POST' });
+                const data = await r.json();
+                if (data.ok) {
+                    statusEl.textContent = '';
+                } else {
+                    statusEl.textContent = 'Error: ' + (data.error || 'Unknown');
+                }
+            } catch (e) {
+                statusEl.textContent = 'Error: ' + e.message;
+            }
+        }
+
+        gearBtn.onclick = () => {
+            settingsOverlay.classList.add('visible');
+        };
+
+        settingsOverlay.onclick = () => {
+            settingsOverlay.classList.remove('visible');
+        };
+
+        closeSettings.onclick = () => {
+            settingsOverlay.classList.remove('visible');
+        };
+
+        settingsExitBtn.onclick = () => {
+            settingsOverlay.classList.remove('visible');
+        };
+
+        addBtn.onclick = async () => {
+            const file = fileInput.files[0];
+            const name = nameInput.value.trim();
+            if (!file || !name) {
+                alert('Select a file and enter a name.');
+                return;
+            }
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('name', name);
+            addBtn.disabled = true;
+            try {
+                const r = await fetch('/api/buttons', {
+                    method: 'POST',
+                    body: formData
+                });
+                if (r.ok) {
+                    buttons = await fetch('/api/buttons').then(r => r.json());
+                    renderButtons();
+                    renderSettingsList();
+                    fileInput.value = '';
+                    nameInput.value = '';
+                } else {
+                    const err = await r.json();
+                    alert(err.error || 'Failed to add');
+                }
+            } catch (e) {
+                alert('Error: ' + e.message);
+            }
+            addBtn.disabled = false;
+        };
+
+        async function removeButton(index) {
+            try {
+                const r = await fetch('/api/buttons/' + index, { method: 'DELETE' });
+                if (r.ok) {
+                    buttons = await fetch('/api/buttons').then(r => r.json());
+                    renderButtons();
+                    renderSettingsList();
+                }
+            } catch (e) {
+                alert('Error: ' + e.message);
+            }
+        }
+
+        async function moveUp(index) {
+            if (index <= 0) return;
+            [buttons[index], buttons[index - 1]] = [buttons[index - 1], buttons[index]];
+            await saveOrder();
+        }
+
+        async function moveDown(index) {
+            if (index >= buttons.length - 1) return;
+            [buttons[index], buttons[index + 1]] = [buttons[index + 1], buttons[index]];
+            await saveOrder();
+        }
+
+        async function saveOrder() {
+            try {
+                const r = await fetch('/api/buttons', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ buttons })
+                });
+                if (r.ok) {
+                    buttons = await fetch('/api/buttons').then(r => r.json());
+                    renderButtons();
+                    renderSettingsList();
+                }
+            } catch (e) {
+                alert('Error: ' + e.message);
+            }
+        }
+
+        loadButtons();
+    </script>
+</body>
+</html>

@@ -1,18 +1,16 @@
 # UniFi Protect Multi-Camera Viewer ([Viewport](https://store.ui.com/us/en/products/ufp-viewport) Alternative)
 
-A Python application that displays multiple UniFi Protect camera streams in a dynamic fullscreen grid layout using Tkinter. Features automatic camera discovery, RTSP stream management, and motion detection with visual highlighting.
-
-## Camera View
-
-![Multi-camera fullscreen grid](images/cam_view.png)
+A Python application that displays multiple UniFi Protect camera streams in a dynamic fullscreen grid layout using Tkinter. Features automatic camera discovery, RTSP stream management, and a web control panel for video playback overlays.
 
 ## Features
 
 - **Dynamic Grid Layout**: Automatically arranges cameras in an N×N grid based on the number of detected cameras
 - **UniFi Protect Integration**: Automatically discovers cameras via UniFi Protect Integration API
 - **RTSP Stream Management**: Automatically creates and manages RTSP streams of the desired quality
-- **Motion Detection**: Visual motion highlighting with pulsing blue border (trailing buffer)
-- **Flask Webhook Server**: Receives motion detection events from UniFi Protect
+- **Video Control Panel**: Web UI to trigger MP4/MOV playback on stream windows
+- **Video Playback Overlay**: Play videos (MP4/MOV) overlaid on any camera feed in the grid
+- **Scheduled Video Playback**: Configure videos to play automatically at specific times (24h format)
+- **Button Management**: Add, remove, and reorder video buttons via the settings panel
 - **Automatic Reconnection**: Streams automatically reconnect on failure with configurable retry delay
 - **Fullscreen Display**: Clean fullscreen interface with date/time overlay
 - **Status Overlays**: Real-time status indicators (LIVE, Frozen, reconnecting) on each camera feed
@@ -25,65 +23,43 @@ A Python application that displays multiple UniFi Protect camera streams in a dy
 
 ## Configuration
 
-Edit `config.py` to configure:
+Copy `config.example.py` to `config.py` and edit:
 
 - `API_KEY`: Your UniFi Protect Integration API key
-- `UNIFI_HOST`: IP address of your UniFi Protect console (default: `192.168.1.1`)
-- `STREAM_QUALITY`: RTSP stream quality - `"high"`, `"medium"`, or `"low"` (default: `"high"`)
+- `UNIFI_HOST`: IP address of your UniFi Protect console (e.g. `192.168.1.1`)
+- `STREAM_QUALITY`: RTSP stream quality - `"high"`, `"medium"`, or `"low"`
 - `RETRY_SECONDS`: Reconnection delay in seconds (default: `60`)
-- `ENABLE_MOTION_DETECTION`: Enable/disable motion highlighting (default: `True`)
+- `VIDEOS_FOLDER`: Folder for MP4 files (relative to project root)
+- `BUTTONS_JSON`: Path to video button definitions (default: `buttons.json`)
+- `SCHEDULED_VIDEOS`: List of `{"time": "HH:MM", "file": "filename.mp4"}` for scheduled playback
+- `CONTROL_PANEL_PORT`: Web control panel port (default: `5000`)
+- `CONTROL_PANEL_BASE_PATH`: Base URL path for control panel (default: `"/"`)
 
 ## Usage
 
 1. Configure your UniFi Protect API credentials in `config.py`
-2. Set up a webhook in UniFi Protect pointing to `http://<your-pi-ip>:5000/motion`
-3. Run the application
+2. Run the application
 
-
-## Motion Detection
-
-Motion events are received via webhook from UniFi Protect. When motion is detected:
-- A pulsing blue border appears around the affected camera feed
-- The border remains visible after motion stops
-- Motion detection can be disabled via `ENABLE_MOTION_DETECTION` in `config.py`
-
-## Webhook Setup
-
-Configure UniFi Protect to send motion events to:
-```
-http://<raspberry-pi-ip(or any device)>:5000/motion
-```
-
-IMPORTANT: The webhook payload should include the camera name in `alarm.name` (e.g., "Front Door", "Back Door").
-
-## Raspberry Pi Start on Launch Setup (optional)
-[This is how the program can fully replace Unifi Viewport ($200 Viewport vs $60 Raspi)]
-
-1. Create the startup script:
-
-   nano ~/Unifi-Viewport-Alternative/start_cams.sh
-
-   Contents:
-   #!/bin/bash
-   cd /home/user/Unifi-Viewport-Alternative
-   source .venv/bin/activate # if using a virtual environment (optional but reccomended)
-   export DISPLAY=:0
+   ```bash
    python main.py
+   ```
 
-   Then make it executable:
-   chmod +x ~/Unifi-Viewport-Alternative/start_cams.sh
+3. Access the web control panel at `http://<your-ip>:5000` to add videos and trigger playback on stream windows
 
-2. Configure LXDE autostart:
+## Raspberry Pi Setup
 
-   mkdir -p ~/.config/lxsession/LXDE-pi
-   nano ~/.config/lxsession/LXDE-pi/autostart
+Use the provided install script for a one-time setup on Raspberry Pi 5 (or Pi 4):
 
-   Add this line:
-   @/home/user/Unifi-Viewport-Alternative/start_cams.sh
+```bash
+chmod +x install_pi.sh
+./install_pi.sh
+```
 
-3. Ensure the Pi boots to desktop with autologin:
+The script will:
 
-   sudo raspi-config
-   System Options -> Boot / Auto Login -> Desktop Autologin
+- Install system dependencies (Python, ffmpeg, etc.)
+- Create a virtual environment and install Python packages
+- **Prompt for your UniFi Protect API key and host address** to configure the app
+- Create `start_cams.sh` and configure autostart so the app runs on boot
 
-After reboot, Unifi-Viewport-Alternative will start automatically when the desktop loads.
+Ensure **Desktop Autologin** is enabled in `raspi-config` (System Options → Boot / Auto Login → Desktop Autologin).

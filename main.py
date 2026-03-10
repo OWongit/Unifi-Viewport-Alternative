@@ -1,7 +1,11 @@
+import os
+from queue import Queue
+
 from gui import App
 import helpers
 from unifi import UnifiClient
-import time
+from control_panel import start_control_panel
+from config import CONFIG
 
 if __name__ == "__main__":
     try:
@@ -38,11 +42,18 @@ if __name__ == "__main__":
             helpers.log("No active RTSP streams available. Exiting...")
             exit(1)
 
-        # Webhook Server for Motion Events
-        client.start_event_listener()
+        # Create videos folder if needed
+        videos_folder = CONFIG.get("VIDEOS_FOLDER", "videos")
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        videos_path = os.path.join(base_dir, videos_folder)
+        os.makedirs(videos_path, exist_ok=True)
+
+        # Playback queue and control panel
+        playback_queue = Queue()
+        start_control_panel(playback_queue, len(active_streams))
 
         # Start GUI
-        app = App(active_streams, client)
+        app = App(active_streams, client, playback_queue=playback_queue)
         app.start()
         
         # Cleanup on exit

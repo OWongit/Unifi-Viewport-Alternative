@@ -1,3 +1,7 @@
+"""
+Configuration template. Copy to config.py and fill in API_KEY and UNIFI_HOST.
+The install script (install_pi.sh) can generate config.py interactively.
+"""
 CONFIG = {
     "API_KEY": "API_KEY_HERE",
     "UNIFI_HOST": "UNIFI_HOST_HERE",
@@ -11,4 +15,5 @@ CONFIG = {
         {"time": "11:11", "file": "LEBRON.mp4"}
     ],
     "CONTROL_PANEL_PORT": 5000,  # Web control panel port (single webserver)
+    "CONTROL_PANEL_BASE_PATH": "/",  # Base URL path for control panel (default "/")
 }
