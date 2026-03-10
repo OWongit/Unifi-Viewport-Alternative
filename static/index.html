@@ -3,6 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" type="image/png" href="/favicon.png">
     <title>Video Control Panel</title>
     <style>
         /* GitHub Dark Default theme */
@@ -121,6 +122,18 @@
             box-shadow: 0 0 0 1px #58a6ff;
         }
         .add-section input[type="file"] { color: #fff; }
+        .stream-checkboxes { display: flex; flex-direction: column; gap: 8px; }
+        .stream-label { font-size: 14px; color: #8b949e; }
+        .stream-list { display: flex; flex-wrap: wrap; gap: 12px; }
+        .stream-list label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            color: #fff;
+        }
+        .stream-list input[type="checkbox"] { cursor: pointer; accent-color: #58a6ff; }
         .add-btn {
             padding: 10px 20px;
             background: #238636;
@@ -160,6 +173,7 @@
         .btn-info { flex: 1; min-width: 0; }
         .btn-info .name { font-weight: 500; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #fff; }
         .btn-info .file { font-size: 12px; color: #fff; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .btn-info .streams-info { font-size: 11px; color: #8b949e; display: block; }
         .btn-remove {
             padding: 6px 12px;
             background: #21262d;
@@ -243,6 +257,10 @@
             <div class="add-section">
                 <input type="file" id="fileInput" accept=".mp4,.mov,video/mp4,video/quicktime">
                 <input type="text" id="nameInput" placeholder="Button name">
+                <div class="stream-checkboxes" id="streamCheckboxes">
+                    <span class="stream-label">Play on cameras:</span>
+                    <div class="stream-list" id="streamList"></div>
+                </div>
                 <button class="add-btn" id="addBtn">Add Button</button>
             </div>
             <h3>Buttons</h3>
@@ -260,20 +278,45 @@
         const nameInput = document.getElementById('nameInput');
         const addBtn = document.getElementById('addBtn');
         const buttonListEl = document.getElementById('buttonList');
+        const streamListEl = document.getElementById('streamList');
         const closeSettings = document.getElementById('closeSettings');
         const settingsExitBtn = document.getElementById('settingsExitBtn');
 
         let buttons = [];
+        let streamCount = 1;
+        let streamNames = [];
 
         async function loadButtons() {
             try {
-                const r = await fetch('/api/buttons');
-                buttons = await r.json();
+                const [buttonsRes, streamsRes] = await Promise.all([
+                    fetch('/api/buttons'),
+                    fetch('/api/streams')
+                ]);
+                buttons = await buttonsRes.json();
+                const streamsData = await streamsRes.json();
+                streamCount = streamsData.count || 1;
+                streamNames = (streamsData.streams || []).map(s => s.name || `Camera ${s.index + 1}`);
+                renderStreamCheckboxes();
                 renderButtons();
                 renderSettingsList();
             } catch (e) {
                 statusEl.textContent = 'Failed to load buttons: ' + e.message;
             }
+        }
+
+        function renderStreamCheckboxes() {
+            streamListEl.innerHTML = '';
+            for (let i = 0; i < streamCount; i++) {
+                const label = document.createElement('label');
+                const name = streamNames[i] || `Camera ${i + 1}`;
+                label.innerHTML = `<input type="checkbox" class="stream-cb" data-stream="${i}" checked> ${escapeHtml(name)}`;
+                streamListEl.appendChild(label);
+            }
+        }
+
+        function getSelectedStreams() {
+            const checked = document.querySelectorAll('.stream-cb:checked');
+            return Array.from(checked).map(cb => parseInt(cb.dataset.stream, 10));
         }
 
         function renderButtons() {
@@ -294,6 +337,10 @@
                 return;
             }
             buttons.forEach((b, i) => {
+                const streams = b.streams;
+                const streamsText = !streams || streams.length === streamCount
+                    ? 'All cameras'
+                    : streams.map(s => streamNames[s] || `Camera ${s + 1}`).join(', ');
                 const li = document.createElement('li');
                 li.innerHTML = `
                     <div class="btn-order">
@@ -303,6 +350,7 @@
                     <div class="btn-info">
                         <span class="name">${escapeHtml(b.name)}</span><br>
                         <span class="file">${escapeHtml(b.file)}</span>
+                        <span class="streams-info">${escapeHtml(streamsText)}</span>
                     </div>
                     <button class="btn-remove" onclick="removeButton(${i})">Remove</button>
                 `;
@@ -354,9 +402,11 @@
                 alert('Select a file and enter a name.');
                 return;
             }
+            const selectedStreams = getSelectedStreams();
             const formData = new FormData();
             formData.append('file', file);
             formData.append('name', name);
+            formData.append('streams', JSON.stringify(selectedStreams));
             addBtn.disabled = true;
             try {
                 const r = await fetch('/api/buttons', {
@@ -369,6 +419,7 @@
                     renderSettingsList();
                     fileInput.value = '';
                     nameInput.value = '';
+                    document.querySelectorAll('.stream-cb').forEach(cb => { cb.checked = true; });
                 } else {
                     const err = await r.json();
                     alert(err.error || 'Failed to add');

@@ -17,6 +17,7 @@ logger = logging.getLogger("ControlPanel")
 # Will be set by start_control_panel()
 _playback_queue = None
 _num_streams = 1
+_stream_names = []  # Camera names for display, e.g. ["Front cam", "Back cam"]
 
 
 def _get_buttons_json_path():
@@ -24,6 +25,20 @@ def _get_buttons_json_path():
     base = os.path.dirname(os.path.abspath(__file__))
     path = CONFIG.get("BUTTONS_JSON", "buttons.json")
     return os.path.join(base, path)
+
+
+def _parse_streams(raw: str):
+    """Parse streams from form value. Returns list of valid indices or None (meaning all)."""
+    if not raw or not raw.strip():
+        return None
+    try:
+        parsed = json.loads(raw) if raw.strip().startswith("[") else [int(x.strip()) for x in raw.split(",") if x.strip()]
+        if not parsed:
+            return None
+        valid = [s for s in parsed if isinstance(s, int) and 0 <= s < _num_streams]
+        return sorted(set(valid)) if valid else None
+    except (json.JSONDecodeError, ValueError):
+        return None
 
 
 def _load_buttons():
@@ -81,17 +96,35 @@ def _get_static_folder():
     return os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 
 
-def create_app(playback_queue, num_streams):
+def create_app(playback_queue, num_streams, stream_names=None):
     """Create Flask app with routes. Used by start_control_panel."""
-    global _playback_queue, _num_streams
+    global _playback_queue, _num_streams, _stream_names
     _playback_queue = playback_queue
     _num_streams = max(1, num_streams)
+    _stream_names = stream_names if stream_names and len(stream_names) == _num_streams else [
+        f"Camera {i + 1}" for i in range(_num_streams)
+    ]
 
     app = Flask(__name__, static_folder=_get_static_folder())
+
+    def _get_images_folder():
+        return os.path.join(os.path.dirname(os.path.abspath(__file__)), "images")
 
     @app.route("/")
     def index():
         return send_from_directory(_get_static_folder(), "index.html")
+
+    @app.route("/favicon.png")
+    def favicon():
+        return send_from_directory(_get_images_folder(), "favicon.png")
+
+    @app.route("/api/streams", methods=["GET"])
+    def get_streams():
+        """Return stream count, indices, and camera names for selection."""
+        return jsonify({
+            "count": _num_streams,
+            "streams": [{"index": i, "name": _stream_names[i]} for i in range(_num_streams)]
+        })
 
     @app.route("/api/buttons", methods=["GET"])
     def get_buttons():
@@ -109,6 +142,9 @@ def create_app(playback_queue, num_streams):
         filename = secure_filename(os.path.basename(file.filename))
         if not filename:
             return jsonify({"error": "Invalid filename"}), 400
+        # Parse streams: JSON array or comma-separated indices
+        streams_raw = request.form.get("streams", "")
+        streams = _parse_streams(streams_raw)
         folder = _get_videos_folder()
         os.makedirs(folder, exist_ok=True)
         path = os.path.join(folder, filename)
@@ -119,11 +155,14 @@ def create_app(playback_queue, num_streams):
         except OSError as e:
             return jsonify({"error": str(e)}), 500
         buttons = _load_buttons()
+        entry = {"file": filename, "name": name}
+        if streams is not None:
+            entry["streams"] = streams
         existing = next((i for i, b in enumerate(buttons) if b.get("file") == filename), None)
         if existing is not None:
-            buttons[existing] = {"file": filename, "name": name}
+            buttons[existing] = entry
         else:
-            buttons.append({"file": filename, "name": name})
+            buttons.append(entry)
         _save_buttons(buttons)
         return jsonify({"ok": True})
 
@@ -156,7 +195,12 @@ def create_app(playback_queue, num_streams):
         buttons = []
         for b in raw:
             if isinstance(b, dict) and "file" in b and "name" in b:
-                buttons.append({"file": str(b["file"]), "name": str(b["name"])})
+                entry = {"file": str(b["file"]), "name": str(b["name"])}
+                if "streams" in b and isinstance(b["streams"], list):
+                    valid = [s for s in b["streams"] if isinstance(s, int) and 0 <= s < _num_streams]
+                    if valid:
+                        entry["streams"] = sorted(set(valid))
+                buttons.append(entry)
         _save_buttons(buttons)
         return jsonify({"ok": True})
 
@@ -168,14 +212,23 @@ def create_app(playback_queue, num_streams):
         if not path:
             return jsonify({"ok": False, "error": "Invalid or missing video"}), 400
 
-        stream_index = random.randint(0, _num_streams - 1)
+        # Find button to get allowed streams; default to all if not set
+        buttons = _load_buttons()
+        allowed = list(range(_num_streams))
+        for b in buttons:
+            if b.get("file") == filename and b.get("streams"):
+                valid = [s for s in b["streams"] if isinstance(s, int) and 0 <= s < _num_streams]
+                if valid:
+                    allowed = valid
+                break
+        stream_index = random.choice(allowed)
         _playback_queue.put((path, stream_index))
         return jsonify({"ok": True, "stream": stream_index})
 
     return app
 
 
-def _run_scheduler(playback_queue, num_streams):
+def _run_scheduler(playback_queue, num_streams, stream_names=None):
     """Background thread: check SCHEDULED_VIDEOS every minute."""
     from datetime import datetime
 
@@ -185,6 +238,35 @@ def _run_scheduler(playback_queue, num_streams):
 
     last_triggered = {}  # time_str -> timestamp
     folder = _get_videos_folder()
+    names = stream_names if stream_names and len(stream_names) == num_streams else []
+
+    def resolve_streams(entry):
+        """Resolve stream/streams/camera/cameras to list of valid indices."""
+        allowed = list(range(num_streams))
+        if "stream" in entry and isinstance(entry["stream"], int) and 0 <= entry["stream"] < num_streams:
+            return [entry["stream"]]
+        if "streams" in entry and isinstance(entry["streams"], list):
+            valid = [s for s in entry["streams"] if isinstance(s, int) and 0 <= s < num_streams]
+            if valid:
+                return valid
+        if "camera" in entry and names:
+            name = str(entry["camera"]).strip()
+            for i, n in enumerate(names):
+                if n and n.strip().lower() == name.lower():
+                    return [i]
+        if "cameras" in entry and names:
+            name_list = entry["cameras"]
+            if isinstance(name_list, list):
+                indices = []
+                for nm in name_list:
+                    nstr = str(nm).strip().lower()
+                    for i, n in enumerate(names):
+                        if n and n.strip().lower() == nstr:
+                            indices.append(i)
+                            break
+                if indices:
+                    return indices
+        return allowed
 
     while True:
         try:
@@ -212,7 +294,8 @@ def _run_scheduler(playback_queue, num_streams):
                     logger.warning(f"Scheduled video not found: {path}")
                     continue
 
-                stream_index = random.randint(0, num_streams - 1)
+                allowed = resolve_streams(entry)
+                stream_index = random.choice(allowed)
                 playback_queue.put((path, stream_index))
                 last_triggered[time_str] = now.timestamp()
                 logger.info(f"Scheduled playback: {file_name} on stream {stream_index}")
@@ -223,7 +306,7 @@ def _run_scheduler(playback_queue, num_streams):
         time.sleep(60)  # Check every minute
 
 
-def start_control_panel(playback_queue, num_streams):
+def start_control_panel(playback_queue, num_streams, stream_names=None):
     """Start Flask control panel and scheduler in background threads."""
     # Ensure buttons.json exists
     path = _get_buttons_json_path()
@@ -231,7 +314,7 @@ def start_control_panel(playback_queue, num_streams):
         _save_buttons([])
 
     port = CONFIG.get("CONTROL_PANEL_PORT", 5000)
-    app = create_app(playback_queue, num_streams)
+    app = create_app(playback_queue, num_streams, stream_names)
 
     def run_flask():
         logger.info(f"Starting Control Panel on port {port}...")
@@ -247,7 +330,7 @@ def start_control_panel(playback_queue, num_streams):
     if CONFIG.get("SCHEDULED_VIDEOS"):
         st = threading.Thread(
             target=_run_scheduler,
-            args=(playback_queue, num_streams),
+            args=(playback_queue, num_streams, stream_names),
             daemon=True
         )
         st.start()

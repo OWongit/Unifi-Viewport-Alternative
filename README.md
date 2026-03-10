@@ -35,7 +35,7 @@ Copy `config.example.py` to `config.py` and edit:
 - `RETRY_SECONDS`: Reconnection delay in seconds (default: `60`)
 - `VIDEOS_FOLDER`: Folder for MP4 files (relative to project root)
 - `BUTTONS_JSON`: Path to video button definitions (default: `buttons.json`)
-- `SCHEDULED_VIDEOS`: List of `{"time": "HH:MM", "file": "filename.mp4"}` for scheduled playback
+- `SCHEDULED_VIDEOS`: List of `{"time": "HH:MM", "file": "filename.mp4"}` for scheduled playback. Optional camera: `"stream": 0`, `"streams": [0, 1]`, `"camera": "Front cam"`, or `"cameras": ["Front cam", "Back cam"]`
 - `CONTROL_PANEL_PORT`: Web control panel port (default: `5000`)
 - `CONTROL_PANEL_BASE_PATH`: Base URL path for control panel (default: `"/"`)
 

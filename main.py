@@ -50,7 +50,8 @@ if __name__ == "__main__":
 
         # Playback queue and control panel
         playback_queue = Queue()
-        start_control_panel(playback_queue, len(active_streams))
+        stream_names = [s.get("name", f"Camera {i+1}") for i, s in enumerate(active_streams)]
+        start_control_panel(playback_queue, len(active_streams), stream_names)
 
         # Start GUI
         app = App(active_streams, client, playback_queue=playback_queue)
