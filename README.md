@@ -2,6 +2,10 @@
 
 A Python application that displays multiple UniFi Protect camera streams in a dynamic fullscreen grid layout using Tkinter. Features automatic camera discovery, RTSP stream management, and a web control panel for video playback overlays.
 
+## Camera View
+
+![Multi-camera fullscreen grid](images/cam_view.png)
+
 ## Features
 
 - **Dynamic Grid Layout**: Automatically arranges cameras in an N×N grid based on the number of detected cameras
