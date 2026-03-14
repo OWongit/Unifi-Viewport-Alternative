@@ -1,6 +1,6 @@
 CONFIG = {
-    "API_KEY": "API_KEY_HERE",
-    "UNIFI_HOST": "UNIFI_HOST_HERE",
+    "API_KEY": "m52OoqTx1NICTmsjN-h7JvE-eFDqc3zY",
+    "UNIFI_HOST": "192.168.1.1",
     "STREAM_QUALITY": "low",  # Options: "high", "medium", "low"
     "RETRY_SECONDS": 60,
     "TARGET_HEIGHT": 540,  # Default height for placeholder images
