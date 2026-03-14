@@ -68,18 +68,43 @@ if [ -z "$API_KEY" ] || [ -z "$UNIFI_HOST" ]; then
     echo -e "${YELLOW}You can edit config.py manually later.${NC}"
 fi
 
-echo -e "${BLUE}[6/10]${NC} Writing config.py..."
+echo ""
+read -p "$(echo -e ${YELLOW}Enter control panel username for Advanced Settings: ${NC})" ADMIN_USER
+read -sp "$(echo -e ${YELLOW}Enter control panel password: ${NC})" ADMIN_PASS
+echo ""
+
+echo -e "${BLUE}[6/10]${NC} Writing config.py and auth.json..."
+export PROJECT_DIR
 export API_KEY
 export UNIFI_HOST
+export ADMIN_USER
+export ADMIN_PASS
+export PROJECT_DIR
 python3 << 'PYEOF'
 import os
+import json
+from werkzeug.security import generate_password_hash
+
 api_key = os.environ.get("API_KEY", "")
 unifi_host = os.environ.get("UNIFI_HOST", "")
-with open("config.example.py") as f:
-    content = f.read()
-content = content.replace("API_KEY_HERE", api_key).replace("UNIFI_HOST_HERE", unifi_host)
-with open("config.py", "w") as f:
-    f.write(content)
+admin_user = os.environ.get("ADMIN_USER", "").strip()
+admin_pass = os.environ.get("ADMIN_PASS", "")
+base = os.environ.get("PROJECT_DIR", os.getcwd())
+if os.path.exists(os.path.join(base, "config.example.py")):
+    with open(os.path.join(base, "config.example.py")) as f:
+        content = f.read()
+    content = content.replace("API_KEY_HERE", api_key).replace("UNIFI_HOST_HERE", unifi_host)
+    with open(os.path.join(base, "config.py"), "w") as f:
+        f.write(content)
+
+if admin_user and admin_pass:
+    auth_path = os.path.join(base, "auth.json")
+    auth = {
+        "username": admin_user,
+        "password_hash": generate_password_hash(admin_pass, method="pbkdf2:sha256")
+    }
+    with open(auth_path, "w") as f:
+        json.dump(auth, f, indent=2)
 PYEOF
 echo -e "${GREEN}Config saved.${NC}"
 

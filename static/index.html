@@ -64,6 +64,42 @@
         }
         .play-btn:active { background: #161b22; }
         .status { margin-top: 20px; color: #fff; font-size: 14px; }
+        .stats-box {
+            font-size: 12px;
+            padding: 8px 16px;
+            margin-bottom: 20px;
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            color: #8b949e;
+            box-shadow: 0 0 12px rgba(88, 166, 255, 0.15);
+        }
+        .stats-box span { color: #fff; }
+        .search-bar {
+            margin-bottom: 20px;
+        }
+        .search-bar input {
+            width: 100%;
+            padding: 10px 14px 10px 36px;
+            font-size: 14px;
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            color: #fff;
+        }
+        .search-bar input::placeholder { color: #8b949e; }
+        .search-bar input:focus { outline: none; border-color: #58a6ff; }
+        .search-wrap { position: relative; display: block; width: 100%; }
+        .search-wrap::before {
+            content: "⌕";
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 14px;
+            color: #8b949e;
+            pointer-events: none;
+        }
 
         /* Settings overlay */
         .settings-overlay {
@@ -82,11 +118,41 @@
             border: 1px solid #30363d;
             border-radius: 6px;
             padding: 24px;
-            width: 420px;
+            width: 480px;
             max-height: 80vh;
             overflow-y: auto;
             box-shadow: 0 0 24px rgba(88, 166, 255, 0.08);
         }
+        .tab-bar { display: flex; gap: 0; margin-bottom: 20px; border-bottom: 1px solid #30363d; }
+        .tab-btn {
+            padding: 10px 20px;
+            background: transparent;
+            border: none;
+            color: #8b949e;
+            cursor: pointer;
+            font-size: 14px;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -1px;
+        }
+        .tab-btn:hover { color: #fff; }
+        .tab-btn.active { color: #58a6ff; border-bottom-color: #58a6ff; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; margin-bottom: 8px; }
+        .ip-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 20px; }
+        .ip-table th, .ip-table td { padding: 8px 12px; text-align: left; border-bottom: 1px solid #21262d; }
+        .ip-table th { color: #8b949e; font-weight: 500; }
+        .ip-toggle { padding: 4px 12px; font-size: 12px; cursor: pointer; border-radius: 4px; }
+        .ip-toggle.blocked { background: #f85149; border: 1px solid #da3633; color: #fff; }
+        .ip-toggle.allowed { background: #238636; border: 1px solid #2ea043; color: #fff; }
+        .schedule-add { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 16px; }
+        .schedule-add input, .schedule-add select { padding: 8px 12px; background: #0d1117; border: 1px solid #30363d; color: #fff; border-radius: 6px; }
+        #scheduleFile { max-width: 180px; width: 180px; box-sizing: border-box; }
+        .schedule-list { list-style: none; padding: 0; margin: 0; }
+        .schedule-list li { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid #21262d; font-size: 13px; }
+        .schedule-list li span { flex: 1; }
+        .login-form { display: flex; flex-direction: column; gap: 16px; }
+        .login-form input { padding: 10px 12px; background: #0d1117; border: 1px solid #30363d; color: #fff; border-radius: 6px; }
+        .login-form button { margin-top: 4px; }
         .settings-panel h2 { margin-top: 0; margin-right: 32px; color: #fff; }
         .settings-panel h3 { color: #fff; }
         .settings-exit-btn {
@@ -185,7 +251,7 @@
         }
         .btn-remove:hover { background: rgba(248, 81, 73, 0.15); box-shadow: 0 0 12px rgba(248, 81, 73, 0.15); }
         .close-settings {
-            margin-top: 20px;
+            margin-top: 24px;
             padding: 10px 24px;
             background: #21262d;
             color: #fff;
@@ -245,6 +311,16 @@
         <button class="gear-btn" id="gearBtn" title="Settings">&#9881;</button>
     </header>
 
+    <div class="stats-box" id="statsBox">
+        <span id="statsStorage">—</span> | <span id="statsButtons">—</span> buttons | Top 24h: <span id="stats24h">—</span> | Top week: <span id="statsWeek">—</span>
+    </div>
+
+    <div class="search-bar">
+        <div class="search-wrap">
+            <input type="text" id="searchInput" placeholder="Search buttons..." autocomplete="off">
+        </div>
+    </div>
+
     <main>
         <div class="buttons" id="buttons"></div>
         <p class="status" id="status"></p>
@@ -254,6 +330,11 @@
         <div class="settings-panel" onclick="event.stopPropagation()">
             <button class="settings-exit-btn" id="settingsExitBtn" title="Close">&#215;</button>
             <h2>Settings</h2>
+            <div class="tab-bar">
+                <button class="tab-btn active" data-tab="settings">Settings</button>
+                <button class="tab-btn" data-tab="advanced">Advanced</button>
+            </div>
+            <div id="tabSettings" class="tab-content active">
             <div class="add-section">
                 <input type="file" id="fileInput" accept=".mp4,.mov,video/mp4,video/quicktime">
                 <input type="text" id="nameInput" placeholder="Button name">
@@ -265,6 +346,36 @@
             </div>
             <h3>Buttons</h3>
             <ul class="button-list" id="buttonList"></ul>
+            </div>
+            <div id="tabAdvanced" class="tab-content">
+                <div id="advancedLogin" class="login-form" style="display:none">
+                    <h3>Login</h3>
+                    <input type="text" id="loginUser" placeholder="Username">
+                    <input type="password" id="loginPass" placeholder="Password">
+                    <button class="add-btn" id="loginBtn">Login</button>
+                    <p id="loginError" style="color:#f85149;font-size:13px;display:none"></p>
+                </div>
+                <div id="advancedNotConfigured" style="display:none;color:#8b949e">
+                    Advanced settings not configured. Run install script to set up.
+                </div>
+                <div id="advancedContent" style="display:none">
+                    <p style="margin-bottom:12px"><button class="btn-remove" id="logoutBtn">Logout</button></p>
+                    <h3>Recent devices (last 24h)</h3>
+                    <table class="ip-table" id="ipTable">
+                        <thead><tr><th>IP</th><th>Last action</th><th>Control</th></tr></thead>
+                        <tbody id="ipTableBody"></tbody>
+                    </table>
+                    <p id="ipEmpty" class="empty-msg" style="display:none">No devices in last 24h</p>
+                    <h3>Advanced schedule</h3>
+                    <div class="schedule-add">
+                        <input type="text" id="scheduleTime" placeholder="HH:MM" maxlength="5" title="24-hour time (e.g. 14:30)">
+                        <select id="scheduleFile"></select>
+                        <div class="stream-list" id="scheduleStreamList"></div>
+                        <button class="add-btn" id="scheduleAddBtn">Add</button>
+                    </div>
+                    <ul class="schedule-list" id="scheduleList"></ul>
+                </div>
+            </div>
             <button class="close-settings" id="closeSettings">Close</button>
         </div>
     </div>
@@ -281,10 +392,28 @@
         const streamListEl = document.getElementById('streamList');
         const closeSettings = document.getElementById('closeSettings');
         const settingsExitBtn = document.getElementById('settingsExitBtn');
+        const searchInput = document.getElementById('searchInput');
 
         let buttons = [];
         let streamCount = 1;
         let streamNames = [];
+        let authState = { configured: false, authenticated: false };
+
+        async function refreshStats() {
+            try {
+                const r = await fetch('/api/stats');
+                const d = await r.json();
+                document.getElementById('statsStorage').textContent = `${d.storage_used_gb ?? '—'} GB / ${d.storage_total_gb ?? '—'} GB`;
+                document.getElementById('statsButtons').textContent = d.button_count ?? '—';
+                document.getElementById('stats24h').textContent = d.most_used_24h ? `${d.most_used_24h.name} (${d.most_used_24h.count})` : '—';
+                document.getElementById('statsWeek').textContent = d.most_used_week ? `${d.most_used_week.name} (${d.most_used_week.count})` : '—';
+            } catch (e) {
+                document.getElementById('statsStorage').textContent = '—';
+                document.getElementById('statsButtons').textContent = '—';
+                document.getElementById('stats24h').textContent = '—';
+                document.getElementById('statsWeek').textContent = '—';
+            }
+        }
 
         async function loadButtons() {
             try {
@@ -299,6 +428,7 @@
                 renderStreamCheckboxes();
                 renderButtons();
                 renderSettingsList();
+                refreshStats();
             } catch (e) {
                 statusEl.textContent = 'Failed to load buttons: ' + e.message;
             }
@@ -320,8 +450,12 @@
         }
 
         function renderButtons() {
+            const q = (searchInput?.value || '').trim().toLowerCase();
+            const filtered = q
+                ? buttons.filter(b => (b.name || '').toLowerCase().includes(q) || (b.file || '').toLowerCase().includes(q))
+                : buttons;
             buttonsEl.innerHTML = '';
-            buttons.forEach(b => {
+            filtered.forEach(b => {
                 const btn = document.createElement('button');
                 btn.className = 'play-btn';
                 btn.textContent = b.name;
@@ -371,6 +505,7 @@
                 const data = await r.json();
                 if (data.ok) {
                     statusEl.textContent = '';
+                    refreshStats();
                 } else {
                     statusEl.textContent = 'Error: ' + (data.error || 'Unknown');
                 }
@@ -379,20 +514,210 @@
             }
         }
 
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.onclick = () => {
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                btn.classList.add('active');
+                document.getElementById('tab' + btn.dataset.tab.charAt(0).toUpperCase() + btn.dataset.tab.slice(1)).classList.add('active');
+                if (btn.dataset.tab === 'advanced') loadAdvancedTab();
+            };
+        });
+
+        async function loadAdvancedTab() {
+            try {
+                const r = await fetch('/api/auth/check', { credentials: 'same-origin' });
+                authState = await r.json();
+                document.getElementById('advancedLogin').style.display = 'none';
+                document.getElementById('advancedNotConfigured').style.display = 'none';
+                document.getElementById('advancedContent').style.display = 'none';
+                if (!authState.configured) {
+                    document.getElementById('advancedNotConfigured').style.display = 'block';
+                    return;
+                }
+                if (!authState.authenticated) {
+                    document.getElementById('advancedLogin').style.display = 'block';
+                    document.getElementById('loginError').style.display = 'none';
+                    return;
+                }
+                document.getElementById('advancedContent').style.display = 'block';
+                loadAdvancedIPs();
+                loadAdvancedSchedule();
+                loadScheduleVideos();
+            } catch (e) {
+                document.getElementById('advancedNotConfigured').style.display = 'block';
+            }
+        }
+
+        document.getElementById('logoutBtn').onclick = async () => {
+            await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' });
+            authState.authenticated = false;
+            loadAdvancedTab();
+        };
+
+        document.getElementById('loginBtn').onclick = async () => {
+            const user = document.getElementById('loginUser').value.trim();
+            const pass = document.getElementById('loginPass').value;
+            document.getElementById('loginError').style.display = 'none';
+            try {
+                const r = await fetch('/api/auth/login', {
+                    credentials: 'same-origin',
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: user, password: pass })
+                });
+                if (r.ok) {
+                    authState.authenticated = true;
+                    document.getElementById('loginUser').value = '';
+                    document.getElementById('loginPass').value = '';
+                    loadAdvancedTab();
+                } else {
+                    const d = await r.json();
+                    document.getElementById('loginError').textContent = d.error || 'Login failed';
+                    document.getElementById('loginError').style.display = 'block';
+                }
+            } catch (e) {
+                document.getElementById('loginError').textContent = 'Error: ' + e.message;
+                document.getElementById('loginError').style.display = 'block';
+            }
+        };
+
+        async function loadAdvancedIPs() {
+            try {
+                const r = await fetch('/api/advanced/ips', { credentials: 'same-origin' });
+                if (!r.ok) return;
+                const data = await r.json();
+                const tbody = document.getElementById('ipTableBody');
+                tbody.innerHTML = '';
+                const ips = Object.entries(data.ip_last_action || {});
+                document.getElementById('ipEmpty').style.display = ips.length ? 'none' : 'block';
+                ips.forEach(([ip, info]) => {
+                    const blocked = (data.blocked_ips || []).includes(ip);
+                    const tr = document.createElement('tr');
+                    const ts = info.ts ? new Date(info.ts * 1000).toLocaleString() : '-';
+                    tr.innerHTML = `<td>${escapeHtml(ip)}</td><td>${escapeHtml(info.action || 'play')} - ${ts}</td><td><button class="ip-toggle ${blocked ? 'blocked' : 'allowed'}" data-ip="${escapeHtml(ip)}">${blocked ? 'Enable' : 'Disable'}</button></td>`;
+                    tbody.appendChild(tr);
+                });
+                tbody.querySelectorAll('.ip-toggle').forEach(btn => {
+                    btn.onclick = async () => {
+                        const ip = btn.dataset.ip;
+                        const blocked = (data.blocked_ips || []).includes(ip);
+                        const endpoint = blocked ? '/api/advanced/ips/unblock' : '/api/advanced/ips/block';
+                        const r = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ip }) });
+                        if (r.ok) loadAdvancedIPs();
+                    };
+                });
+            } catch (e) {}
+        }
+
+        async function loadScheduleVideos() {
+            try {
+                const [buttonsRes, videosRes] = await Promise.all([fetch('/api/buttons'), fetch('/api/videos')]);
+                const btnList = await buttonsRes.json();
+                const files = await videosRes.json();
+                const fileToName = {};
+                (btnList || []).forEach(b => { if (b.file && b.name) fileToName[b.file] = b.name; });
+                const sel = document.getElementById('scheduleFile');
+                const truncate = (s, len = 22) => s.length > len ? s.slice(0, len - 3) + '...' : s;
+                let opts = '<option value="">Select video</option>';
+                (btnList || []).forEach(b => {
+                    if (b.file && files.includes(b.file)) opts += `<option value="${escapeHtml(b.file)}">${escapeHtml(truncate(b.name))}</option>`;
+                });
+                files.forEach(f => {
+                    if (!fileToName[f]) opts += `<option value="${escapeHtml(f)}">${escapeHtml(truncate(f))}</option>`;
+                });
+                sel.innerHTML = opts;
+            } catch (e) {}
+        }
+
+        async function loadAdvancedSchedule() {
+            try {
+                const r = await fetch('/api/advanced/schedule', { credentials: 'same-origin' });
+                if (!r.ok) return;
+                const schedule = await r.json();
+                const list = document.getElementById('scheduleList');
+                list.innerHTML = '';
+                const streamList = document.getElementById('scheduleStreamList');
+                streamList.innerHTML = '';
+                for (let i = 0; i < streamCount; i++) {
+                    const label = document.createElement('label');
+                    label.innerHTML = `<input type="checkbox" class="schedule-stream-cb" data-stream="${i}"> ${escapeHtml(streamNames[i] || 'Camera ' + (i+1))}`;
+                    streamList.appendChild(label);
+                }
+                const fileToName = {};
+                (buttons || []).forEach(b => { if (b.file && b.name) fileToName[b.file] = b.name; });
+                schedule.forEach((entry, i) => {
+                    const streams = entry.streams ? entry.streams.map(s => streamNames[s] || 'Cam ' + (s+1)).join(', ') : (entry.stream !== undefined ? (streamNames[entry.stream] || 'Cam ' + (entry.stream+1)) : 'All');
+                    const displayName = fileToName[entry.file] || entry.file;
+                    const li = document.createElement('li');
+                    li.innerHTML = `<span>${escapeHtml(entry.time)} - ${escapeHtml(displayName)} (${streams})</span><button class="btn-remove" onclick="removeScheduleItem(${i})">Remove</button>`;
+                    list.appendChild(li);
+                });
+            } catch (e) {}
+        }
+
+        async function removeScheduleItem(index) {
+            try {
+                const r = await fetch('/api/advanced/schedule/' + index, { method: 'DELETE' });
+                if (r.ok) loadAdvancedSchedule();
+            } catch (e) {}
+        }
+
+        document.getElementById('scheduleAddBtn').onclick = async () => {
+            const timeEl = document.getElementById('scheduleTime');
+            const fileEl = document.getElementById('scheduleFile');
+            const raw = (timeEl.value || '').trim();
+            const match = raw.match(/^(\d{1,2}):(\d{1,2})$/);
+            let time = '';
+            if (match) {
+                const h = parseInt(match[1], 10);
+                const m = parseInt(match[2], 10);
+                if (h >= 0 && h <= 23 && m >= 0 && m <= 59) {
+                    time = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+                }
+            }
+            const file = fileEl.value;
+            if (!time || !file) { alert('Select time and video'); return; }
+            const streams = Array.from(document.querySelectorAll('.schedule-stream-cb:checked')).map(cb => parseInt(cb.dataset.stream, 10));
+            const body = { time, file };
+            if (streams.length > 0 && streams.length < streamCount) body.streams = streams;
+            try {
+                const r = await fetch('/api/advanced/schedule', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                if (r.ok) {
+                    loadAdvancedSchedule();
+                    timeEl.value = '';
+                    fileEl.value = '';
+                    document.querySelectorAll('.schedule-stream-cb').forEach(cb => { cb.checked = true; });
+                } else {
+                    const d = await r.json();
+                    alert(d.error || 'Failed');
+                }
+            } catch (e) { alert('Error: ' + e.message); }
+        };
+
         gearBtn.onclick = () => {
             settingsOverlay.classList.add('visible');
         };
 
+        searchInput.addEventListener('input', () => renderButtons());
+
         settingsOverlay.onclick = () => {
             settingsOverlay.classList.remove('visible');
+            refreshStats();
         };
 
         closeSettings.onclick = () => {
             settingsOverlay.classList.remove('visible');
+            refreshStats();
         };
 
         settingsExitBtn.onclick = () => {
             settingsOverlay.classList.remove('visible');
+            refreshStats();
         };
 
         addBtn.onclick = async () => {
@@ -420,6 +745,7 @@
                     fileInput.value = '';
                     nameInput.value = '';
                     document.querySelectorAll('.stream-cb').forEach(cb => { cb.checked = true; });
+                    refreshStats();
                 } else {
                     const err = await r.json();
                     alert(err.error || 'Failed to add');
@@ -437,6 +763,7 @@
                     buttons = await fetch('/api/buttons').then(r => r.json());
                     renderButtons();
                     renderSettingsList();
+                    refreshStats();
                 }
             } catch (e) {
                 alert('Error: ' + e.message);
@@ -466,6 +793,7 @@
                     buttons = await fetch('/api/buttons').then(r => r.json());
                     renderButtons();
                     renderSettingsList();
+                    refreshStats();
                 }
             } catch (e) {
                 alert('Error: ' + e.message);

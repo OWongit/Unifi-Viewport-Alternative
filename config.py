@@ -13,4 +13,5 @@ CONFIG = {
         {"time": "14:38", "file": "Add_Bigfoot_to_Webcam_Capture.mp4", "streams": "front cam"},
     ],
     "CONTROL_PANEL_PORT": 5000,
+    "SECRET_KEY": "change-me-in-production",
 }

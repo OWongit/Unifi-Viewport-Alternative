@@ -177,3 +177,5 @@ cython_debug/
 .config.py
 my_config.py
 config.py
+auth.json
+ip_access.json

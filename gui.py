@@ -36,6 +36,7 @@ class App:
         self.unifi_client = unifi_client
         self.playback_queue = playback_queue
         self.overlay_state = {}  # stream_index -> MP4FrameSource
+        self.overlay_start_times = {}  # stream_index -> float (when overlay started)
         self.num_cams = len(camera_configs)
         
         # Calculate Grid Size (NxN approx)
@@ -95,6 +96,7 @@ class App:
         for overlay in self.overlay_state.values():
             overlay.close()
         self.overlay_state.clear()
+        self.overlay_start_times.clear()
         for s in self.streams:
             s.stop()
         self.root.destroy()
@@ -111,17 +113,38 @@ class App:
         if not self.labels: return
 
         # Process playback requests from control panel
+        # Queue items: (path, allowed_stream_indices) - pick stream with earliest start time
         if self.playback_queue:
             try:
                 while True:
-                    path, stream_index = self.playback_queue.get_nowait()
-                    if 0 <= stream_index < len(self.streams):
-                        # Close existing overlay on this stream if any
-                        if stream_index in self.overlay_state:
-                            self.overlay_state[stream_index].close()
-                            del self.overlay_state[stream_index]
-                        self.overlay_state[stream_index] = MP4FrameSource(path)
-                        logger.info(f"Playing {path} on stream {stream_index}")
+                    path, allowed = self.playback_queue.get_nowait()
+                    if not isinstance(allowed, (list, tuple)):
+                        allowed = [allowed] if isinstance(allowed, int) else list(range(self.num_cams))
+                    allowed = [s for s in allowed if isinstance(s, int) and 0 <= s < len(self.streams)]
+                    if not allowed:
+                        allowed = list(range(len(self.streams)))
+                    # Prefer empty slots; among full slots, pick the one with earliest start time
+                    now = time.time()
+                    best_stream = None
+                    best_start = None  # None = empty (prefer), else float
+                    for s in allowed:
+                        if s not in self.overlay_state:
+                            best_stream = s
+                            best_start = None
+                            break
+                        st = self.overlay_start_times.get(s)
+                        if best_start is None or (st is not None and st < best_start):
+                            best_stream = s
+                            best_start = st
+                    if best_stream is not None:
+                        evicted = best_stream in self.overlay_state
+                        if evicted:
+                            self.overlay_state[best_stream].close()
+                            del self.overlay_state[best_stream]
+                            del self.overlay_start_times[best_stream]
+                        self.overlay_state[best_stream] = MP4FrameSource(path)
+                        self.overlay_start_times[best_stream] = now
+                        logger.info(f"Playing {path} on stream {best_stream}" + (" (evicted earliest)" if evicted else ""))
             except Empty:
                 pass  # Queue empty
 
@@ -151,6 +174,7 @@ class App:
             if frame is None:
                 overlay.close()
                 del self.overlay_state[stream_index]
+                self.overlay_start_times.pop(stream_index, None)
                 frame, status, ts = stream.get_frame()
         else:
             frame, status, ts = stream.get_frame()
