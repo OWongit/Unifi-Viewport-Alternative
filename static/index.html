@@ -63,6 +63,11 @@
             box-shadow: 0 0 16px rgba(88, 166, 255, 0.1);
         }
         .play-btn:active { background: #161b22; }
+        .play-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
         .status { margin-top: 20px; color: #fff; font-size: 14px; }
         .stats-box {
             font-size: 12px;
@@ -360,6 +365,11 @@
                 </div>
                 <div id="advancedContent" style="display:none">
                     <p style="margin-bottom:12px"><button class="btn-remove" id="logoutBtn">Logout</button></p>
+                    <h3>Button controls</h3>
+                    <label class="controls-toggle-wrap" style="display:flex;align-items:center;gap:10px;margin-bottom:20px;cursor:pointer">
+                        <input type="checkbox" id="controlsDisabledCb">
+                        <span>Disable button controls for everyone</span>
+                    </label>
                     <h3>Recent devices (last 24h)</h3>
                     <table class="ip-table" id="ipTable">
                         <thead><tr><th>IP</th><th>Last action</th><th>Control</th></tr></thead>
@@ -397,6 +407,7 @@
         let buttons = [];
         let streamCount = 1;
         let streamNames = [];
+        let controlsDisabled = false;
         let authState = { configured: false, authenticated: false };
 
         async function refreshStats() {
@@ -425,6 +436,7 @@
                 const streamsData = await streamsRes.json();
                 streamCount = streamsData.count || 1;
                 streamNames = (streamsData.streams || []).map(s => s.name || `Camera ${s.index + 1}`);
+                controlsDisabled = streamsData.controls_disabled === true;
                 renderStreamCheckboxes();
                 renderButtons();
                 renderSettingsList();
@@ -459,7 +471,8 @@
                 const btn = document.createElement('button');
                 btn.className = 'play-btn';
                 btn.textContent = b.name;
-                btn.onclick = () => play(b.file);
+                btn.disabled = controlsDisabled;
+                if (!controlsDisabled) btn.onclick = () => play(b.file);
                 buttonsEl.appendChild(btn);
             });
         }
@@ -499,6 +512,10 @@
         }
 
         async function play(filename) {
+            if (controlsDisabled) {
+                statusEl.textContent = 'Button controls are disabled';
+                return;
+            }
             statusEl.textContent = 'Playing...';
             try {
                 const r = await fetch('/play/' + encodeURIComponent(filename), { method: 'POST' });
@@ -541,6 +558,7 @@
                     return;
                 }
                 document.getElementById('advancedContent').style.display = 'block';
+                loadAdvancedControls();
                 loadAdvancedIPs();
                 loadAdvancedSchedule();
                 loadScheduleVideos();
@@ -581,6 +599,30 @@
                 document.getElementById('loginError').style.display = 'block';
             }
         };
+
+        async function loadAdvancedControls() {
+            try {
+                const r = await fetch('/api/advanced/controls', { credentials: 'same-origin' });
+                if (!r.ok) return;
+                const data = await r.json();
+                const cb = document.getElementById('controlsDisabledCb');
+                if (!cb) return;
+                cb.checked = data.controls_disabled === true;
+                cb.onchange = async () => {
+                    const disabled = cb.checked;
+                    const res = await fetch('/api/advanced/controls', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ controls_disabled: disabled }),
+                        credentials: 'same-origin'
+                    });
+                    if (res.ok) {
+                        controlsDisabled = disabled;
+                        renderButtons();
+                    }
+                };
+            } catch (e) {}
+        }
 
         async function loadAdvancedIPs() {
             try {

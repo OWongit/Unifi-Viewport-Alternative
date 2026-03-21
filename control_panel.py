@@ -186,6 +186,32 @@ def _save_ip_access(ip_last_action, blocked_ips):
         json.dump({"ip_last_action": ip_last_action, "blocked_ips": blocked_ips}, f, indent=2)
 
 
+def _get_app_settings_path():
+    """Return path to app_settings.json."""
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), "app_settings.json")
+
+
+def _load_app_settings():
+    """Load app_settings.json. Returns {controls_disabled: bool}."""
+    path = _get_app_settings_path()
+    default = {"controls_disabled": False}
+    if not os.path.isfile(path):
+        return default
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return {"controls_disabled": bool(data.get("controls_disabled", False))}
+    except (json.JSONDecodeError, OSError):
+        return default
+
+
+def _save_app_settings(controls_disabled):
+    """Save app_settings.json."""
+    path = _get_app_settings_path()
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump({"controls_disabled": controls_disabled}, f, indent=2)
+
+
 def _record_ip_action(ip, action="play"):
     """Record or overwrite the most recent action for an IP."""
     data = _load_ip_access()
@@ -291,10 +317,12 @@ def create_app(playback_queue, num_streams, stream_names=None):
 
     @app.route("/api/streams", methods=["GET"])
     def get_streams():
-        """Return stream count, indices, and camera names for selection."""
+        """Return stream count, indices, camera names, and controls_disabled."""
+        settings = _load_app_settings()
         return jsonify({
             "count": _num_streams,
-            "streams": [{"index": i, "name": _stream_names[i]} for i in range(_num_streams)]
+            "streams": [{"index": i, "name": _stream_names[i]} for i in range(_num_streams)],
+            "controls_disabled": settings["controls_disabled"]
         })
 
     @app.route("/api/buttons", methods=["GET"])
@@ -380,6 +408,9 @@ def create_app(playback_queue, num_streams, stream_names=None):
 
     @app.route("/play/<path:filename>", methods=["POST"])
     def play(filename):
+        settings = _load_app_settings()
+        if settings.get("controls_disabled"):
+            return jsonify({"ok": False, "error": "Button controls are disabled"}), 403
         client_ip = _get_client_ip()
         data = _load_ip_access()
         if client_ip in data["blocked_ips"]:
@@ -491,6 +522,20 @@ def create_app(playback_queue, num_streams, stream_names=None):
         data["blocked_ips"] = [x for x in data["blocked_ips"] if x != ip]
         _save_ip_access(data["ip_last_action"], data["blocked_ips"])
         return jsonify({"ok": True})
+
+    @app.route("/api/advanced/controls", methods=["GET"])
+    @require_auth
+    def get_advanced_controls():
+        settings = _load_app_settings()
+        return jsonify({"controls_disabled": settings["controls_disabled"]})
+
+    @app.route("/api/advanced/controls", methods=["POST"])
+    @require_auth
+    def set_advanced_controls():
+        data = request.get_json() or {}
+        disabled = bool(data.get("controls_disabled", False))
+        _save_app_settings(disabled)
+        return jsonify({"ok": True, "controls_disabled": disabled})
 
     @app.route("/api/advanced/schedule", methods=["GET"])
     @require_auth

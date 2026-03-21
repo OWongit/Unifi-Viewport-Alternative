@@ -179,4 +179,4 @@ my_config.py
 config.py
 auth.json
 ip_access.json
-my_config.py
+app_settings.json
